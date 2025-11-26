@@ -1,11 +1,20 @@
-import { NextResponse } from 'next/server';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 // Config Firebase
-const firebaseConfig = JSON.parse(process.env.NEXT_PUBLIC_FIREBASE_CONFIG || '{}');
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
+const initFirebase = () => {
+    const configStr = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
+    if (!configStr) return null;
+    try {
+      const firebaseConfig = JSON.parse(configStr);
+      return !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    } catch (e) { 
+      return null; 
+    }
+};
+
+const app = initFirebase();
+const db = app ? getFirestore(app) : null;
 
 // Config Facebook CAPI
 const FACEBOOK_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN;
@@ -42,9 +51,13 @@ async function trackFacebookEvent(eventName: string, userData: any, customData: 
   }
 }
 
-export async function POST(request: Request) {
+export default async function handler(req: any, res: any) {
+  if (req.method !== 'POST') {
+     return res.status(405).json({ message: 'Method Not Allowed' });
+  }
+
   try {
-    const body = await request.json();
+    const body = req.body;
     console.log("🔔 Webhook recebido:", body);
 
     // A PushinPay envia o ID da transação e o status
@@ -52,7 +65,11 @@ export async function POST(request: Request) {
     const status = body.status;
 
     if (!transactionId) {
-      return NextResponse.json({ message: 'ID não fornecido' }, { status: 400 });
+      return res.status(400).json({ message: 'ID não fornecido' });
+    }
+
+    if (!db) {
+        return res.status(500).json({ message: 'Database not initialized' });
     }
 
     // 1. Buscar a transação no banco de dados para pegar o fbp/fbc que salvamos antes
@@ -61,7 +78,7 @@ export async function POST(request: Request) {
 
     if (!docSnap.exists()) {
       console.log("Transação não encontrada no banco:", transactionId);
-      return NextResponse.json({ message: 'Transação desconhecida' });
+      return res.status(200).json({ message: 'Transação desconhecida' });
     }
 
     const transactionData = docSnap.data();
@@ -92,10 +109,10 @@ export async function POST(request: Request) {
         await updateDoc(docRef, { status: status });
     }
 
-    return NextResponse.json({ success: true });
+    return res.status(200).json({ success: true });
 
   } catch (error: any) {
     console.error('Erro no Webhook:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return res.status(500).json({ error: error.message });
   }
 }
