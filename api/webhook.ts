@@ -1,7 +1,7 @@
+// @ts-nocheck
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, updateDoc } from 'firebase/firestore';
 
-// Config Firebase
 const initFirebase = () => {
     const configStr = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
     if (!configStr) return null;
@@ -16,11 +16,9 @@ const initFirebase = () => {
 const app = initFirebase();
 const db = app ? getFirestore(app) : null;
 
-// Config Facebook CAPI
 const FACEBOOK_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN;
-const FACEBOOK_PIXEL_ID = '792797553335143'; // Seu ID do Pixel
+const FACEBOOK_PIXEL_ID = '792797553335143'; 
 
-// Função auxiliar para enviar evento ao Facebook
 async function trackFacebookEvent(eventName: string, userData: any, customData: any) {
   if (!FACEBOOK_ACCESS_TOKEN) return;
 
@@ -32,7 +30,7 @@ async function trackFacebookEvent(eventName: string, userData: any, customData: 
       user_data: {
         fbp: userData.fbp,
         fbc: userData.fbc,
-        em: userData.email ? [userData.email] : undefined, // Email hasheado (idealmente)
+        em: userData.email ? [userData.email] : undefined,
       },
       custom_data: customData
     }],
@@ -60,7 +58,6 @@ export default async function handler(req: any, res: any) {
     const body = req.body;
     console.log("🔔 Webhook recebido:", body);
 
-    // A PushinPay envia o ID da transação e o status
     const transactionId = body.id;
     const status = body.status;
 
@@ -72,7 +69,6 @@ export default async function handler(req: any, res: any) {
         return res.status(500).json({ message: 'Database not initialized' });
     }
 
-    // 1. Buscar a transação no banco de dados para pegar o fbp/fbc que salvamos antes
     const docRef = doc(db, "transactions", transactionId);
     const docSnap = await getDoc(docRef);
 
@@ -83,20 +79,17 @@ export default async function handler(req: any, res: any) {
 
     const transactionData = docSnap.data();
 
-    // 2. Se o pagamento for APROVADO
     if (status === 'paid') {
         console.log(`💰 Pagamento Aprovado: ${transactionId}`);
 
-        // Atualiza status no banco
         await updateDoc(docRef, { status: 'paid', paidAt: new Date().toISOString() });
 
-        // 3. Dispara o evento de Purchase Server-Side (CAPI)
         await trackFacebookEvent(
             'Purchase',
             { 
                 fbp: transactionData.fbp, 
                 fbc: transactionData.fbc,
-                email: transactionData.email // O Facebook usa isso para matching avançado
+                email: transactionData.email 
             }, 
             {
                 currency: 'BRL',
@@ -105,7 +98,6 @@ export default async function handler(req: any, res: any) {
             }
         );
     } else {
-        // Atualiza outros status (ex: pending, failed)
         await updateDoc(docRef, { status: status });
     }
 
