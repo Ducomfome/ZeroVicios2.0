@@ -382,10 +382,8 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
               <div className="bg-white p-4 rounded-xl border-2 border-slate-100 inline-block shadow-sm relative group">
                 <img 
                     src={
-                    pixData.qrCodeBase64 
-                        ? (pixData.qrCodeBase64.startsWith('data:image') 
-                            ? pixData.qrCodeBase64 
-                            : `data:image/png;base64,${pixData.qrCodeBase64}`)
+                    (typeof pixData.qrCodeBase64 === 'string' && pixData.qrCodeBase64.startsWith('data:image'))
+                        ? pixData.qrCodeBase64 
                         : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixData.copiaECola)}`
                     } 
                     alt="QR Code Pix" 
