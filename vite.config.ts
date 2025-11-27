@@ -5,6 +5,15 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'recharts': ['recharts'],
+          'firebase': ['firebase/app', 'firebase/firestore'],
+          'vendor': ['react', 'react-dom']
+        }
+      }
+    }
   },
   define: {
     // Vite substitui essas variáveis em tempo de build. 
