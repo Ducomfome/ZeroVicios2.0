@@ -19,33 +19,45 @@ const db = app ? getFirestore(app) : null;
 const FACEBOOK_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN;
 const FACEBOOK_PIXEL_ID = '792797553335143'; 
 
-async function trackFacebookEvent(eventName: string, userData: any, customData: any) {
-  if (!FACEBOOK_ACCESS_TOKEN) return;
+async function trackFacebookEvent(eventName: string, userData: any, customData: any, eventId?: string) {
+  if (!FACEBOOK_ACCESS_TOKEN) {
+    console.log("⚠️ FACEBOOK_ACCESS_TOKEN não configurado. Pulei o evento.");
+    return;
+  }
+
+  // Prepara user_data filtrando campos vazios
+  const fbUserData: any = {};
+  if (userData.fbp) fbUserData.fbp = userData.fbp;
+  if (userData.fbc) fbUserData.fbc = userData.fbc;
+  if (userData.email) {
+      // O Facebook recomenda hash SHA256 do email, mas aceita texto simples (embora avise) se você não tiver como hashear no serverless facilmente sem libs extras.
+      // O ideal é usar uma lib crypto nativa se possível, mas aqui enviaremos como array conforme doc básica.
+      fbUserData.em = [userData.email]; 
+  }
+  if (userData.phone) fbUserData.ph = [userData.phone];
 
   const payload = {
     data: [{
       event_name: eventName,
       event_time: Math.floor(Date.now() / 1000),
       action_source: "website",
-      user_data: {
-        fbp: userData.fbp,
-        fbc: userData.fbc,
-        em: userData.email ? [userData.email] : undefined,
-      },
+      event_id: eventId, // ID crucial para deduplicação
+      user_data: fbUserData,
       custom_data: customData
     }],
     access_token: FACEBOOK_ACCESS_TOKEN
   };
 
   try {
-    await fetch(`https://graph.facebook.com/v17.0/${FACEBOOK_PIXEL_ID}/events`, {
+    const response = await fetch(`https://graph.facebook.com/v17.0/${FACEBOOK_PIXEL_ID}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    console.log(`🎯 Pixel Facebook (${eventName}) disparado via Server-Side!`);
+    const result = await response.json();
+    console.log(`🎯 Pixel Facebook (${eventName}) disparado via Server-Side!`, result);
   } catch (e) {
-    console.error('Erro ao disparar Pixel:', e);
+    console.error('Erro ao disparar Pixel CAPI:', e);
   }
 }
 
@@ -58,7 +70,8 @@ export default async function handler(req: any, res: any) {
     const body = req.body;
     console.log("🔔 Webhook recebido:", body);
 
-    const transactionId = body.id;
+    // Adaptação para diferentes formatos de webhook
+    const transactionId = body.id || body.reference_id || body.transaction_id;
     const status = body.status;
 
     if (!transactionId) {
@@ -69,7 +82,8 @@ export default async function handler(req: any, res: any) {
         return res.status(500).json({ message: 'Database not initialized' });
     }
 
-    const docRef = doc(db, "transactions", transactionId);
+    // Busca a transação original para pegar os cookies do Pixel
+    const docRef = doc(db, "transactions", String(transactionId));
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) {
@@ -79,26 +93,32 @@ export default async function handler(req: any, res: any) {
 
     const transactionData = docSnap.data();
 
-    if (status === 'paid') {
+    if (status === 'paid' && transactionData.status !== 'paid') {
         console.log(`💰 Pagamento Aprovado: ${transactionId}`);
 
         await updateDoc(docRef, { status: 'paid', paidAt: new Date().toISOString() });
 
+        // Dispara o evento Purchase Server-Side (CAPI)
+        // O event_id DEVE ser o mesmo que foi usado no frontend (transactionId)
         await trackFacebookEvent(
             'Purchase',
             { 
                 fbp: transactionData.fbp, 
                 fbc: transactionData.fbc,
-                email: transactionData.email 
+                email: transactionData.email,
+                phone: transactionData.phone
             }, 
             {
                 currency: 'BRL',
-                value: transactionData.price,
-                transaction_id: transactionId
-            }
+                value: transactionData.price
+            },
+            String(transactionId) 
         );
     } else {
-        await updateDoc(docRef, { status: status });
+        // Apenas atualiza status se mudou
+        if (transactionData.status !== status) {
+            await updateDoc(docRef, { status: status });
+        }
     }
 
     return res.status(200).json({ success: true });

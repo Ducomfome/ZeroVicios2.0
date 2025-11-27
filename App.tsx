@@ -20,6 +20,12 @@ import {
 // =========================================================
 // TIPOS E CONFIGURAÇÕES
 // =========================================================
+declare global {
+  interface Window {
+    fbq: any;
+  }
+}
+
 type VideoKey = "vsl" | "test1" | "test2";
 
 const VIDEO_SOURCES: Record<VideoKey, string> = {
@@ -40,6 +46,13 @@ const getCookie = (name: string) => {
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop()?.split(";").shift();
   return null;
+};
+
+// Helper do Pixel
+const trackPixel = (eventName: string, params?: any) => {
+  if (typeof window !== 'undefined' && window.fbq) {
+    window.fbq('track', eventName, params);
+  }
 };
 
 // =========================================================
@@ -201,6 +214,7 @@ export default function App() {
 
   // Mostrar botão flutuante após rolar a página
   useEffect(() => {
+    trackPixel('ViewContent'); // Pixel: Evento Ver Conteúdo ao carregar
     const handleScroll = () => {
       setShowStickyCTA(window.scrollY > 600);
     };
@@ -212,6 +226,20 @@ export default function App() {
     setSelectedPlan({ name: planName, price });
     setCheckoutState('form');
     setIsModalOpen(true);
+    
+    // Pixel: Adicionar ao Carrinho e Iniciar Finalização de Compra
+    trackPixel('AddToCart', {
+      content_name: planName,
+      value: price,
+      currency: 'BRL',
+      content_type: 'product'
+    });
+    trackPixel('InitiateCheckout', {
+      content_name: planName,
+      value: price,
+      currency: 'BRL',
+      content_type: 'product'
+    });
   };
 
   const closeModal = () => setIsModalOpen(false);
@@ -245,6 +273,26 @@ export default function App() {
       if (response.ok && data.success) {
         setPixData(data);
         setCheckoutState('pix');
+
+        // Pixel: Disparar eventos de conversão (Lado do Cliente)
+        trackPixel('AddPaymentInfo', {
+           content_name: selectedPlan?.name,
+           value: selectedPlan?.price,
+           currency: 'BRL'
+        });
+        trackPixel('Lead', {
+           content_name: 'Cadastro Pix'
+        });
+        
+        // Disparar Purchase client-side com ID de evento para deduplicação com API
+        trackPixel('Purchase', {
+           content_name: selectedPlan?.name,
+           value: selectedPlan?.price,
+           currency: 'BRL',
+           event_id: data.id, // ID crucial para deduplicação com o servidor
+           content_type: 'product'
+        });
+
       } else {
         console.error("Erro API:", data);
         alert(data.error || 'Erro ao gerar PIX. Verifique os dados e tente novamente.');

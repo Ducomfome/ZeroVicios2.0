@@ -33,7 +33,7 @@ export default async function handler(req: any, res: any) {
   try {
     // Garante que o body seja um objeto
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { name, email, cpf, price, plan, phone } = body;
+    const { name, email, cpf, price, plan, phone, fbc, fbp } = body;
     const transactionId = crypto.randomUUID();
 
     // Inicializar Firebase
@@ -111,6 +111,8 @@ export default async function handler(req: any, res: any) {
             price: price,
             phone: phone,
             cpf: cpf,
+            fbc: fbc || null, // Pixel Cookie
+            fbp: fbp || null, // Pixel Cookie
             paradise_transaction_id: data.transaction_id,
             product_hash: productHash,
             created_at: new Date().toISOString(),
