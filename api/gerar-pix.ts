@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
-import crypto from 'crypto';
 
 // CONFIGURAÇÃO DIRETA DO FIREBASE
 const firebaseConfig = {
@@ -40,6 +39,8 @@ export default async function handler(req: any, res: any) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { name, email, cpf, price, plan, phone, fbc, fbp, cep, street, number, district, city, state } = body;
+    
+    // Gera UUID seguro usando crypto global (funciona em Node e Vercel)
     const transactionId = crypto.randomUUID();
 
     let userLocation = "Desconhecido";
@@ -77,7 +78,7 @@ export default async function handler(req: any, res: any) {
     const paradisePayload = {
       amount: Math.round(Number(price) * 100),
       description: `${plan} - Zero Vicios`,
-      reference: transactionId,
+      reference: transactionId, // UUID NOSSO
       postback_url: `${(process.env.NEXT_PUBLIC_BASE_URL || 'https://' + process.env.VERCEL_URL).replace(/\/$/, '')}/api/webhook`,
       productHash: productHash, 
       customer: {
@@ -109,7 +110,7 @@ export default async function handler(req: any, res: any) {
         console.warn("⚠️ API Key Paradise ausente. Usando modo simulação.");
         data = {
             status: "success",
-            transaction_id: transactionId,
+            transaction_id: transactionId, // Em simulação, ID é o mesmo
             qr_code: "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-42661417400052040000530398654041.005802BR5913Zero Vicios6008Brasilia62070503***6304E2CA",
             qr_code_base64: "", 
             amount: Math.round(Number(price) * 100),
@@ -119,7 +120,7 @@ export default async function handler(req: any, res: any) {
 
     if (data.status === "success" || data.transaction_id) {
         if (db) {
-          await safeSaveToFirestore(db, String(data.transaction_id), {
+          await safeSaveToFirestore(db, String(transactionId), {
             status: 'pending',
             provider: 'paradise',
             plan: plan,
@@ -137,7 +138,7 @@ export default async function handler(req: any, res: any) {
             location: userLocation,
             fbc: fbc || null,
             fbp: fbp || null,
-            paradise_transaction_id: data.transaction_id,
+            paradise_transaction_id: data.transaction_id, // SALVA ID DA PARADISE PARA O WEBHOOK ACHAR
             product_hash: productHash,
             created_at: new Date().toISOString(),
             pix_code: data.qr_code,
@@ -147,7 +148,7 @@ export default async function handler(req: any, res: any) {
 
         return res.status(200).json({
           success: true,
-          id: data.transaction_id,
+          id: transactionId, // Retorna NOSSO UUID para o frontend monitorar
           qrCodeBase64: data.qr_code_base64,
           copiaECola: data.qr_code,
           provider: "Paradise",
