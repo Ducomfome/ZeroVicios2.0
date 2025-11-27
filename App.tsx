@@ -26,6 +26,8 @@ declare global {
   }
 }
 
+const FACEBOOK_PIXEL_ID = '792797553335143';
+
 type VideoKey = "vsl" | "test1" | "test2";
 
 const VIDEO_SOURCES: Record<VideoKey, string> = {
@@ -249,10 +251,34 @@ export default function App() {
     setCheckoutState('loading');
 
     const formData = new FormData(e.currentTarget);
+    const rawEmail = (formData.get('email') as string || '').toLowerCase().trim();
+    const rawName = (formData.get('name') as string || '').toLowerCase().trim();
+    let rawPhone = (formData.get('phone') as string || '').replace(/\D/g, '');
+
+    // Formatação básica de telefone para padrão internacional se possível (Add +55 se for BR)
+    if (rawPhone.length >= 10 && rawPhone.length <= 11) {
+        rawPhone = '55' + rawPhone;
+    }
+
+    const firstName = rawName.split(' ')[0];
+    const lastName = rawName.split(' ').slice(1).join(' ');
+
+    // ADVANCED MATCHING: Atualiza o Pixel com os dados do usuário ANTES de rastrear
+    if (typeof window !== 'undefined' && window.fbq) {
+        console.log("Pixel Advanced Matching disparado");
+        window.fbq('init', FACEBOOK_PIXEL_ID, {
+            em: rawEmail,
+            ph: rawPhone,
+            fn: firstName,
+            ln: lastName,
+            ct: 'br' // Assumindo Brasil
+        });
+    }
+
     const userData = {
       name: formData.get('name'),
       email: formData.get('email'),
-      phone: formData.get('phone'),
+      phone: formData.get('phone'), // Envia original para API
       cpf: formData.get('cpf'),
       plan: selectedPlan?.name,
       price: selectedPlan?.price,
@@ -275,13 +301,17 @@ export default function App() {
         setCheckoutState('pix');
 
         // Pixel: Disparar eventos de conversão (Lado do Cliente)
+        // Como atualizamos o 'init' acima, esses eventos já vão com os dados do usuário
         trackPixel('AddPaymentInfo', {
            content_name: selectedPlan?.name,
            value: selectedPlan?.price,
            currency: 'BRL'
         });
+        
         trackPixel('Lead', {
-           content_name: 'Cadastro Pix'
+           content_name: 'Cadastro Pix',
+           value: selectedPlan?.price, // Opcional, mas bom para ROI de lead
+           currency: 'BRL'
         });
         
         // Disparar Purchase client-side com ID de evento para deduplicação com API
