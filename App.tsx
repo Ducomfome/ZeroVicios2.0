@@ -339,8 +339,7 @@ export default function App() {
       {/* STRIP: LOGOS / AUTORIDADE */}
       <div className="border-b border-slate-200 bg-white py-6">
         <div className="max-w-6xl mx-auto px-4 flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Google_News_icon.svg/1200px-Google_News_icon.svg.png" className="h-8" alt="Media" />
-             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Anvisa_Logo.png/1200px-Anvisa_Logo.png" className="h-8 object-contain" alt="Anvisa" />
+             <div className="flex items-center gap-2 font-bold text-slate-500"><ShieldCheck className="w-6 h-6"/> Registro ANVISA</div>
              <div className="flex items-center gap-2 font-bold text-slate-500"><FlaskConical className="w-6 h-6"/> Ciência Aprovada</div>
              <div className="flex items-center gap-2 font-bold text-slate-500"><CheckCircle className="w-6 h-6"/> 100% Natural</div>
         </div>
@@ -636,9 +635,6 @@ export default function App() {
                         <p><span className="font-semibold text-slate-500">Razão Social:</span> A & G Produtos Naturais LTDA</p>
                     </div>
                 </div>
-                <div className="flex gap-4 items-center">
-                    <img src="https://logodownload.org/wp-content/uploads/2014/07/anvisa-logo-1.png" alt="Anvisa" className="h-8 opacity-30 grayscale" />
-                </div>
             </div>
             
             <div className="border-t border-slate-900 pt-8 text-center md:text-left flex flex-col md:flex-row justify-between text-xs">
@@ -733,7 +729,6 @@ export default function App() {
                   
                   <div className="flex justify-center gap-4 mt-4 opacity-50 grayscale">
                     <img src="https://img.icons8.com/color/48/000000/pix.png" className="h-6" alt="Pix" />
-                    <img src="https://img.icons8.com/color/48/000000/google-safety.png" className="h-6" alt="Safe" />
                   </div>
                 </form>
               )}
