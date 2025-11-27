@@ -41,21 +41,21 @@ export default async function handler(req: any, res: any) {
   try {
     // Garante que o body seja um objeto
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { name, email, cpf, price, plan, phone, fbc, fbp } = body;
+    const { name, email, cpf, price, plan, phone, fbc, fbp, cep, street, number, district, city, state } = body;
     const transactionId = crypto.randomUUID();
 
     // Captura Localização via Headers da Vercel (Lógica Aprimorada)
     let userLocation = "Desconhecido";
     try {
         const rawCity = req.headers['x-vercel-ip-city'];
-        const city = rawCity ? decodeURIComponent(rawCity) : null;
+        const cityHeader = rawCity ? decodeURIComponent(rawCity) : null;
         const region = req.headers['x-vercel-ip-country-region']; // Ex: SP, RJ
         const country = req.headers['x-vercel-ip-country']; // Ex: BR
 
-        if (city && region) {
-            userLocation = `${city} - ${region}`;
-        } else if (city) {
-            userLocation = city;
+        if (cityHeader && region) {
+            userLocation = `${cityHeader} - ${region}`;
+        } else if (cityHeader) {
+            userLocation = cityHeader;
         } else if (region && country) {
             userLocation = `${region}, ${country}`;
         } else if (country) {
@@ -138,7 +138,15 @@ export default async function handler(req: any, res: any) {
             price: price,
             phone: phone,
             cpf: cpf,
-            location: userLocation, // Salva Cidade - Estado
+            // Dados de Endereço
+            address_cep: cep || '',
+            address_street: street || '',
+            address_number: number || '',
+            address_district: district || '',
+            address_city: city || '',
+            address_state: state || '',
+            
+            location: userLocation, // Salva Cidade - Estado (IP)
             fbc: fbc || null, // Pixel Cookie
             fbp: fbp || null, // Pixel Cookie
             paradise_transaction_id: data.transaction_id,

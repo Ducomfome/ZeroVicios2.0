@@ -14,7 +14,10 @@ import {
   Clock,
   ArrowRight,
   MessageCircle,
-  AlertTriangle
+  AlertTriangle,
+  MapPin,
+  Search,
+  PackageCheck
 } from "lucide-react";
 import { AdminDashboard } from "./components/AdminDashboard";
 
@@ -56,6 +59,14 @@ const trackPixel = (eventName: string, params?: any) => {
   if (typeof window !== 'undefined' && window.fbq) {
     window.fbq('track', eventName, params);
   }
+};
+
+// Gerador de Código de Rastreio Fake
+const generateTrackingCode = () => {
+    const prefix = "BR";
+    const numbers = Math.floor(Math.random() * 900000000) + 100000000;
+    const suffix = "PT";
+    return `${prefix}${numbers}${suffix}`;
 };
 
 // =========================================================
@@ -254,6 +265,17 @@ export default function App() {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<VideoKey | null>(null);
   const [showStickyCTA, setShowStickyCTA] = useState(false);
   
+  // Estados para Endereço
+  const [address, setAddress] = useState({
+    cep: '',
+    street: '',
+    number: '',
+    district: '',
+    city: '',
+    state: ''
+  });
+  const [isLoadingCep, setIsLoadingCep] = useState(false);
+
   const videoRefs = useRef<Record<VideoKey, HTMLVideoElement | null>>({
     vsl: null, test1: null, test2: null,
   });
@@ -290,6 +312,31 @@ export default function App() {
 
   const closeModal = () => setIsModalOpen(false);
 
+  // Função para buscar CEP
+  const handleCepBlur = async () => {
+    const cleanCep = address.cep.replace(/\D/g, '');
+    if (cleanCep.length !== 8) return;
+
+    setIsLoadingCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+      if (!data.erro) {
+        setAddress(prev => ({
+          ...prev,
+          street: data.logradouro,
+          district: data.bairro,
+          city: data.localidade,
+          state: data.uf
+        }));
+      }
+    } catch (error) {
+      console.error("Erro ao buscar CEP", error);
+    } finally {
+      setIsLoadingCep(false);
+    }
+  };
+
   const handleGeneratePix = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setCheckoutState('loading');
@@ -299,7 +346,7 @@ export default function App() {
     const rawName = (formData.get('name') as string || '').toLowerCase().trim();
     let rawPhone = (formData.get('phone') as string || '').replace(/\D/g, '');
 
-    // Formatação básica de telefone para padrão internacional se possível (Add +55 se for BR)
+    // Formatação básica de telefone
     if (rawPhone.length >= 10 && rawPhone.length <= 11) {
         rawPhone = '55' + rawPhone;
     }
@@ -307,23 +354,32 @@ export default function App() {
     const firstName = rawName.split(' ')[0];
     const lastName = rawName.split(' ').slice(1).join(' ');
 
-    // ADVANCED MATCHING: Atualiza o Pixel com os dados do usuário ANTES de rastrear
+    // ADVANCED MATCHING
     if (typeof window !== 'undefined' && window.fbq) {
-        console.log("Pixel Advanced Matching disparado");
         window.fbq('init', FACEBOOK_PIXEL_ID, {
             em: rawEmail,
             ph: rawPhone,
             fn: firstName,
             ln: lastName,
-            ct: 'br' // Assumindo Brasil
+            ct: 'br',
+            st: address.state,
+            zp: address.cep.replace(/\D/g, '')
         });
     }
 
     const userData = {
       name: formData.get('name'),
       email: formData.get('email'),
-      phone: formData.get('phone'), // Envia original para API
+      phone: formData.get('phone'),
       cpf: formData.get('cpf'),
+      // Endereço Completo
+      cep: address.cep,
+      street: address.street,
+      number: address.number,
+      district: address.district,
+      city: address.city,
+      state: address.state,
+      
       plan: selectedPlan?.name,
       price: selectedPlan?.price,
       fbc: getCookie('_fbc'),
@@ -331,7 +387,6 @@ export default function App() {
     };
 
     try {
-      // CHAMADA REAL PARA A API NA VERCEL
       const response = await fetch('/api/gerar-pix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -344,8 +399,6 @@ export default function App() {
         setPixData(data);
         setCheckoutState('pix');
 
-        // Pixel: Disparar eventos de conversão (Lado do Cliente)
-        // Como atualizamos o 'init' acima, esses eventos já vão com os dados do usuário
         trackPixel('AddPaymentInfo', {
            content_name: selectedPlan?.name,
            value: selectedPlan?.price,
@@ -354,17 +407,8 @@ export default function App() {
         
         trackPixel('Lead', {
            content_name: 'Cadastro Pix',
-           value: selectedPlan?.price, // Opcional, mas bom para ROI de lead
-           currency: 'BRL'
-        });
-        
-        // Disparar Purchase client-side com ID de evento para deduplicação com API
-        trackPixel('Purchase', {
-           content_name: selectedPlan?.name,
            value: selectedPlan?.price,
-           currency: 'BRL',
-           event_id: data.id, // ID crucial para deduplicação com o servidor
-           content_type: 'product'
+           currency: 'BRL'
         });
 
       } else {
@@ -386,6 +430,19 @@ export default function App() {
     }
   };
 
+  // Função chamada quando o usuário clica em "Já fiz o pagamento"
+  const handlePaymentConfirmation = () => {
+    // Disparar Purchase client-side
+    trackPixel('Purchase', {
+        content_name: selectedPlan?.name,
+        value: selectedPlan?.price,
+        currency: 'BRL',
+        event_id: pixData?.id, 
+        content_type: 'product'
+     });
+     setCheckoutState('success');
+  };
+
   useEffect(() => {
     return () => {
       (Object.keys(videoRefs.current) as VideoKey[]).forEach((k) => {
@@ -394,7 +451,6 @@ export default function App() {
     };
   }, []);
 
-  // SE FOR ADMIN, RENDERIZA O DASHBOARD
   if (isAdmin) {
     return <AdminDashboard />;
   }
@@ -814,6 +870,7 @@ export default function App() {
                     </>
                  )}
                  {checkoutState === 'pix' && <h3 className="text-xl font-bold text-slate-900">Pagamento via PIX</h3>}
+                 {checkoutState === 'success' && <h3 className="text-xl font-bold text-slate-900">Pedido Confirmado!</h3>}
             </div>
 
             <div className="p-6 overflow-y-auto custom-scrollbar">
@@ -829,20 +886,64 @@ export default function App() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1 ml-1">Nome Completo</label>
-                    <input type="text" name="name" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all placeholder:text-slate-400" placeholder="Digite seu nome completo" required />
+                    <input type="text" name="name" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all placeholder:text-slate-400" placeholder="Digite seu nome completo" required />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1 ml-1">E-mail Principal</label>
-                    <input type="email" name="email" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all placeholder:text-slate-400" placeholder="Digite seu melhor e-mail" required />
+                    <input type="email" name="email" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all placeholder:text-slate-400" placeholder="Digite seu melhor e-mail" required />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                         <label className="block text-xs font-bold text-slate-700 uppercase mb-1 ml-1">CPF</label>
-                        <input type="text" name="cpf" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all placeholder:text-slate-400" placeholder="000.000.000-00" required />
+                        <input type="text" name="cpf" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all placeholder:text-slate-400" placeholder="000.000.000-00" required />
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-700 uppercase mb-1 ml-1">WhatsApp</label>
-                        <input type="tel" name="phone" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all placeholder:text-slate-400" placeholder="(DDD) 9..." required />
+                        <input type="tel" name="phone" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all placeholder:text-slate-400" placeholder="(DDD) 9..." required />
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO ENDEREÇO */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <p className="text-xs font-bold text-green-700 uppercase mb-3 flex items-center"><Truck size={14} className="mr-1"/> Dados de Entrega</p>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1 ml-1">CEP</label>
+                            <div className="relative">
+                                <input 
+                                    type="text" 
+                                    value={address.cep}
+                                    onChange={(e) => setAddress({...address, cep: e.target.value})}
+                                    onBlur={handleCepBlur}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 pl-10 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all placeholder:text-slate-400" 
+                                    placeholder="00000-000" 
+                                    required 
+                                />
+                                <div className="absolute left-3 top-3.5 text-slate-400">
+                                    {isLoadingCep ? <div className="w-4 h-4 border-2 border-green-500 rounded-full animate-spin border-t-transparent"></div> : <Search size={16}/>}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="col-span-2">
+                                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 ml-1">Rua</label>
+                                <input type="text" value={address.street} onChange={(e) => setAddress({...address, street: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none" placeholder="Rua..." required />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 ml-1">Número</label>
+                                <input type="text" value={address.number} onChange={(e) => setAddress({...address, number: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none" placeholder="123" required />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                             <div>
+                                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 ml-1">Bairro</label>
+                                <input type="text" value={address.district} onChange={(e) => setAddress({...address, district: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none" placeholder="Bairro" required />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 ml-1">Cidade - UF</label>
+                                <input type="text" value={address.city ? `${address.city} - ${address.state}` : ''} readOnly className="w-full bg-slate-100 border border-slate-200 rounded-xl p-3 text-slate-500 outline-none cursor-not-allowed" placeholder="Cidade" />
+                            </div>
+                        </div>
                     </div>
                   </div>
                   
@@ -871,9 +972,9 @@ export default function App() {
                 </div>
               )}
 
-              {/* PIX DISPLAY (COM CORREÇÃO DE IMAGEM) */}
+              {/* PIX DISPLAY */}
               {checkoutState === 'pix' && pixData && (
-                <div className="text-center space-y-6 animate-fade-in">
+                <div className="text-center space-y-6 animate-fade-in pb-4">
                   
                   <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-sm mb-4">
                     <p className="font-bold flex items-center justify-center gap-2"><Clock className="w-4 h-4"/> Pague em até 10 minutos</p>
@@ -908,16 +1009,58 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-xl text-left space-y-2">
-                    <p className="font-bold text-slate-700">Como pagar:</p>
-                    <ol className="list-decimal pl-4 space-y-1 text-xs">
-                        <li>Abra o aplicativo do seu banco</li>
-                        <li>Escolha a opção <strong>Pix Copia e Cola</strong></li>
-                        <li>Cole o código acima e confirme o pagamento</li>
-                    </ol>
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <p className="text-sm text-slate-600 font-medium mb-4">Após realizar o pagamento no seu banco, clique no botão abaixo para confirmar e liberar seu envio.</p>
+                    <button 
+                        onClick={handlePaymentConfirmation}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-500/30 transition-all transform active:scale-[0.99] flex items-center justify-center gap-2 text-lg uppercase tracking-wide"
+                    >
+                        <CheckCircle className="w-6 h-6" />
+                        JÁ FIZ O PAGAMENTO
+                    </button>
                   </div>
+
                 </div>
               )}
+
+              {/* TELA DE SUCESSO / RASTREIO */}
+              {checkoutState === 'success' && (
+                  <div className="text-center py-8 space-y-6 animate-fade-in-up">
+                      <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 relative">
+                          <Truck className="w-12 h-12 text-green-600 relative z-10" />
+                          <div className="absolute inset-0 bg-green-500 rounded-full blur-xl opacity-20 animate-ping"></div>
+                      </div>
+                      
+                      <div>
+                          <h2 className="text-2xl font-black text-slate-900 mb-2">Pedido Confirmado!</h2>
+                          <p className="text-slate-600">Seu pagamento está sendo processado e em breve seu kit será despachado.</p>
+                      </div>
+
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 relative overflow-hidden">
+                          <div className="absolute top-0 right-0 p-2 opacity-5"><PackageCheck size={80}/></div>
+                          <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-2">Seu Código de Rastreio (Prévia)</p>
+                          <div className="bg-white border border-slate-200 p-3 rounded-lg font-mono text-xl font-bold text-slate-800 tracking-widest shadow-inner">
+                              {generateTrackingCode()}
+                          </div>
+                          <p className="text-xs text-slate-400 mt-2">*O rastreio oficial será enviado por e-mail em até 24h.</p>
+                      </div>
+
+                      <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-left flex gap-3">
+                          <div className="bg-blue-100 p-2 rounded-full h-fit"><MessageCircle className="w-4 h-4 text-blue-600"/></div>
+                          <div>
+                              <p className="font-bold text-blue-900 text-sm">Próximos Passos:</p>
+                              <p className="text-blue-800 text-xs mt-1 leading-relaxed">
+                                  Nossa equipe entrará em contato via WhatsApp e E-mail para confirmar seus dados. O prazo estimado de entrega é de <strong>15 a 30 dias úteis</strong>.
+                              </p>
+                          </div>
+                      </div>
+
+                      <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 text-sm underline">
+                          Voltar ao site
+                      </button>
+                  </div>
+              )}
+
             </div>
             
             {/* Footer do Modal */}
