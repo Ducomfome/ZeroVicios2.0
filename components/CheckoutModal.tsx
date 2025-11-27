@@ -266,7 +266,7 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
             if (data.status === 'paid') {
                 handlePaymentSuccess();
             } else {
-                alert("O banco ainda está processando o pagamento. Aguarde alguns segundos e tente novamente.");
+                alert("O sistema ainda não identificou o pagamento. Se você já pagou, envie o comprovante no botão do WhatsApp abaixo para liberação imediata.");
             }
         } else {
              // Se não achar o documento, pode ser delay de criação ou erro de ID
@@ -458,6 +458,16 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
                         </>
                     )}
                 </button>
+                
+                <a 
+                    href={`https://wa.me/5592984779395?text=${encodeURIComponent(`Olá, fiz o pagamento do pedido ${pixData.id} (Valor R$ ${selectedPlan?.price.toFixed(2)}). Poderia verificar e liberar meu acesso?`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 w-full bg-white border-2 border-green-500 text-green-600 hover:bg-green-50 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wide"
+                >
+                    <MessageCircle className="w-5 h-5" />
+                    Enviar Comprovante / Liberar Agora
+                </a>
               </div>
             </div>
           )}
