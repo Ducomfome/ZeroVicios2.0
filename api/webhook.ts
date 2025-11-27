@@ -3,11 +3,19 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, updateDoc } from 'firebase/firestore';
 import crypto from 'crypto';
 
+// CONFIGURAÇÃO DIRETA DO FIREBASE (FALLBACK)
+const firebaseConfig = {
+  apiKey: "AIzaSyC1PSUlYQ8cliInVq9Nak-_HbmWLl7oBc0",
+  authDomain: "zero-vicios-tracker.firebaseapp.com",
+  projectId: "zero-vicios-tracker",
+  storageBucket: "zero-vicios-tracker.firebasestorage.app",
+  messagingSenderId: "363015306292",
+  appId: "1:363015306292:web:52e53d1fd0e5ec599ade61",
+  measurementId: "G-R22SS7H418"
+};
+
 const initFirebase = () => {
-    const configStr = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
-    if (!configStr) return null;
     try {
-      const firebaseConfig = JSON.parse(configStr);
       return !getApps().length ? initializeApp(firebaseConfig) : getApp();
     } catch (e) { 
       return null; 
@@ -17,7 +25,8 @@ const initFirebase = () => {
 const app = initFirebase();
 const db = app ? getFirestore(app) : null;
 
-const FACEBOOK_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN;
+// TOKEN FACEBOOK HARDCODED (Para garantir envio se a variável de ambiente falhar)
+const FACEBOOK_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN || "EAALT3yVJXDABQAWmBPC8iZBRGhuEadsOxCZA0CtB2IZBXqhAi7CZBNB5tvVkG1fPxttSZA49e7RfCTrgqo1zPGh4hs87UQFd61oAxtIYzcwbppG3lMTgNcQmDCag86XnsliYjZBqkeouG7J1VKOcLxhZCpFVDzCOeycwGpUNYmZCUk99KEyjQucdTGHFhaKWc883jgZDZD";
 const FACEBOOK_PIXEL_ID = '792797553335143'; 
 
 // Função auxiliar para criar Hash SHA256 (Exigência do Facebook para CAPI)

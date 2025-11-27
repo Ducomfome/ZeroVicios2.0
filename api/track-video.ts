@@ -2,11 +2,19 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, updateDoc, increment, getDoc } from 'firebase/firestore';
 
+// CONFIGURAÇÃO DIRETA DO FIREBASE (FALLBACK)
+const firebaseConfig = {
+  apiKey: "AIzaSyC1PSUlYQ8cliInVq9Nak-_HbmWLl7oBc0",
+  authDomain: "zero-vicios-tracker.firebaseapp.com",
+  projectId: "zero-vicios-tracker",
+  storageBucket: "zero-vicios-tracker.firebasestorage.app",
+  messagingSenderId: "363015306292",
+  appId: "1:363015306292:web:52e53d1fd0e5ec599ade61",
+  measurementId: "G-R22SS7H418"
+};
+
 const initFirebase = () => {
-    const configStr = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
-    if (!configStr) return null;
     try {
-      const firebaseConfig = JSON.parse(configStr);
       return !getApps().length ? initializeApp(firebaseConfig) : getApp();
     } catch (e) { 
       return null; 
@@ -24,13 +32,14 @@ export default async function handler(req: any, res: any) {
   const { eventType, videoId } = req.body; // eventType: 'play', '25%', '50%', '75%', 'complete'
 
   if (!db || !eventType || !videoId) {
-    return res.status(400).json({ error: 'Dados inválidos' });
+    return res.status(400).json({ error: 'Dados inválidos ou DB desconectado' });
   }
 
   try {
     const statsRef = doc(db, "analytics", "vsl_stats");
     const docSnap = await getDoc(statsRef);
 
+    // Se o documento não existir, cria a estrutura inicial
     if (!docSnap.exists()) {
       await setDoc(statsRef, {
         [videoId]: {

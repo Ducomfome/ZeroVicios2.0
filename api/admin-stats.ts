@@ -2,11 +2,19 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, doc, getDoc, query, orderBy, limit } from 'firebase/firestore';
 
+// CONFIGURAÇÃO DIRETA DO FIREBASE (FALLBACK)
+const firebaseConfig = {
+  apiKey: "AIzaSyC1PSUlYQ8cliInVq9Nak-_HbmWLl7oBc0",
+  authDomain: "zero-vicios-tracker.firebaseapp.com",
+  projectId: "zero-vicios-tracker",
+  storageBucket: "zero-vicios-tracker.firebasestorage.app",
+  messagingSenderId: "363015306292",
+  appId: "1:363015306292:web:52e53d1fd0e5ec599ade61",
+  measurementId: "G-R22SS7H418"
+};
+
 const initFirebase = () => {
-    const configStr = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
-    if (!configStr) return null;
     try {
-      const firebaseConfig = JSON.parse(configStr);
       return !getApps().length ? initializeApp(firebaseConfig) : getApp();
     } catch (e) { 
       return null; 
@@ -53,7 +61,7 @@ export default async function handler(req: any, res: any) {
       const data = doc.data();
       totalLeads++;
 
-      // Lista para tabela (limitada a 50 no array para não pesar)
+      // Lista para tabela (limitada a 100 para não estourar payload)
       if (leadsList.length < 100) {
         leadsList.push({
           id: doc.id,
