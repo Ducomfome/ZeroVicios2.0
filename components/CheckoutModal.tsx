@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Lock, AlertTriangle, Truck, Search, 
   Copy, Clock, CheckCircle, PackageCheck, MessageCircle, Loader2
@@ -78,6 +78,7 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
     state: ''
   });
 
+  // Limpa estados ao abrir/fechar
   useEffect(() => {
     if (isOpen) {
         setCheckoutState('form');
@@ -86,22 +87,36 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
     }
   }, [isOpen]);
 
+  // Listener de Pagamento (Firebase)
   useEffect(() => {
     let unsubscribe: () => void;
-    if (checkoutState === 'pix' && pixData?.id && db) {
-        unsubscribe = onSnapshot(doc(db, "transactions", pixData.id), (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                if (data.status === 'paid') {
-                    handlePaymentSuccess();
+    
+    // Verificações de segurança antes de chamar o Firestore
+    if (checkoutState === 'pix' && pixData && pixData.id && db) {
+        try {
+            // Garante que é string e remove espaços em branco
+            const docId = String(pixData.id).trim();
+
+            if (!docId) return; // Se ID estiver vazio, não faz nada
+
+            unsubscribe = onSnapshot(doc(db, "transactions", docId), (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data && data.status === 'paid') {
+                        handlePaymentSuccess();
+                    }
                 }
-            }
-        });
+            }, (error) => {
+                console.error("Erro no listener do Firestore:", error);
+            });
+        } catch (e) {
+            console.error("Erro crítico ao conectar listener:", e);
+        }
     }
     return () => {
         if (unsubscribe) unsubscribe();
     };
-  }, [checkoutState, pixData, db]);
+  }, [checkoutState, pixData]); // Removido 'db' das dependências para evitar re-runs desnecessários
 
   if (!isOpen) return null;
 
@@ -184,7 +199,14 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setPixData(data);
+        // SANITIZAÇÃO CRÍTICA DO ID
+        const safeId = data.id ? String(data.id) : "";
+        
+        setPixData({
+            qrCodeBase64: data.qrCodeBase64 || "",
+            copiaECola: data.copiaECola || "",
+            id: safeId
+        });
         setCheckoutState('pix');
 
         trackPixel('AddPaymentInfo', {
@@ -223,7 +245,7 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
             content_name: selectedPlan?.name,
             value: selectedPlan?.price,
             currency: 'BRL',
-            event_id: pixData?.id, 
+            event_id: pixData?.id ? String(pixData.id) : undefined, 
             content_type: 'product'
          });
          setCheckoutState('success');
@@ -235,7 +257,10 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
     
     setIsCheckingPayment(true);
     try {
-        const docSnap = await getDoc(doc(db, "transactions", pixData.id));
+        const docId = String(pixData.id).trim();
+        if (!docId) return;
+
+        const docSnap = await getDoc(doc(db, "transactions", docId));
         if (docSnap.exists()) {
             const data = docSnap.data();
             if (data.status === 'paid') {
@@ -243,12 +268,27 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
             } else {
                 alert("O banco ainda está processando o pagamento. Aguarde alguns segundos e tente novamente.");
             }
+        } else {
+             // Se não achar o documento, pode ser delay de criação ou erro de ID
+             alert("Aguardando registro da transação. Tente novamente em 5 segundos.");
         }
     } catch (error) {
         console.error("Erro ao verificar pagamento:", error);
     } finally {
         setIsCheckingPayment(false);
     }
+  };
+
+  // Safe QR Code Source
+  const getQrCodeSource = () => {
+      if (!pixData) return '';
+      if (typeof pixData.qrCodeBase64 === 'string' && pixData.qrCodeBase64.startsWith('data:image')) {
+          return pixData.qrCodeBase64;
+      }
+      if (pixData.copiaECola) {
+          return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixData.copiaECola)}`;
+      }
+      return '';
   };
 
   return (
@@ -380,15 +420,15 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
               </div>
 
               <div className="bg-white p-4 rounded-xl border-2 border-slate-100 inline-block shadow-sm relative group">
-                <img 
-                    src={
-                    (typeof pixData.qrCodeBase64 === 'string' && pixData.qrCodeBase64.startsWith('data:image'))
-                        ? pixData.qrCodeBase64 
-                        : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(pixData.copiaECola)}`
-                    } 
-                    alt="QR Code Pix" 
-                    className="w-56 h-56 mx-auto mix-blend-multiply" 
-                />
+                {getQrCodeSource() ? (
+                    <img 
+                        src={getQrCodeSource()}
+                        alt="QR Code Pix" 
+                        className="w-56 h-56 mx-auto mix-blend-multiply" 
+                    />
+                ) : (
+                    <div className="w-56 h-56 flex items-center justify-center bg-slate-100 text-slate-400 text-xs">QR Code Indisponível</div>
+                )}
               </div>
               
               <div className="space-y-2">
