@@ -36,6 +36,11 @@ export default async function handler(req: any, res: any) {
     const { name, email, cpf, price, plan, phone, fbc, fbp } = body;
     const transactionId = crypto.randomUUID();
 
+    // Captura Localização via Headers da Vercel
+    const city = req.headers['x-vercel-ip-city'] ? decodeURIComponent(req.headers['x-vercel-ip-city']) : 'Desconhecido';
+    const region = req.headers['x-vercel-ip-country-region'] || '';
+    const userLocation = region ? `${city} - ${region}` : city;
+
     // Inicializar Firebase
     const app = initFirebase();
     const db = app ? getFirestore(app) : null;
@@ -111,6 +116,7 @@ export default async function handler(req: any, res: any) {
             price: price,
             phone: phone,
             cpf: cpf,
+            location: userLocation, // Salva Cidade - Estado
             fbc: fbc || null, // Pixel Cookie
             fbp: fbp || null, // Pixel Cookie
             paradise_transaction_id: data.transaction_id,

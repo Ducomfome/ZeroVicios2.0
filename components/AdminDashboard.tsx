@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { DollarSign, Users, PlayCircle, ShoppingCart, Loader2 } from 'lucide-react';
+import { DollarSign, Users, PlayCircle, ShoppingCart, Loader2, MapPin, AlertCircle } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const [data, setData] = useState<any>(null);
@@ -42,7 +42,16 @@ export const AdminDashboard: React.FC = () => {
     );
   }
 
-  if (!data) return <div className="text-white">Erro ao carregar dados.</div>;
+  // Proteção se a API falhar ou não retornar nada
+  if (!data || !data.financial) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-4 text-center">
+            <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Erro de Conexão</h2>
+            <p className="text-slate-400">Não foi possível carregar os dados. Verifique a configuração do Firebase.</p>
+        </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
@@ -51,8 +60,16 @@ export const AdminDashboard: React.FC = () => {
           <h1 className="text-3xl font-black text-white tracking-tight">Painel Admin <span className="text-green-500">Zero Vícios</span></h1>
           <p className="text-slate-400 text-sm">Visão geral em tempo real</p>
         </div>
-        <div className="bg-slate-900 px-4 py-2 rounded-lg border border-slate-800">
-           <span className="text-green-500 font-bold text-xs uppercase">Status:</span> Online
+        <div className="flex items-center gap-2">
+            {data.dbStatus === 'connected' ? (
+                 <div className="bg-green-900/30 px-4 py-2 rounded-lg border border-green-800 text-green-400 text-xs font-bold uppercase flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Sistema Online
+                 </div>
+            ) : (
+                <div className="bg-red-900/30 px-4 py-2 rounded-lg border border-red-800 text-red-400 text-xs font-bold uppercase flex items-center gap-2">
+                    <AlertCircle size={14} /> Banco Desconectado
+                 </div>
+            )}
         </div>
       </header>
 
@@ -124,32 +141,44 @@ export const AdminDashboard: React.FC = () => {
                   <th className="px-4 py-3">Data</th>
                   <th className="px-4 py-3">Nome</th>
                   <th className="px-4 py-3">Email/Tel</th>
+                  <th className="px-4 py-3">Localização</th>
                   <th className="px-4 py-3">Plano</th>
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {data.leads.map((lead: any) => (
-                  <tr key={lead.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                        {new Date(lead.date).toLocaleDateString('pt-BR')} <br/>
-                        <span className="text-xs opacity-50">{new Date(lead.date).toLocaleTimeString('pt-BR')}</span>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-white truncate max-w-[150px]">{lead.name}</td>
-                    <td className="px-4 py-3">
-                        <div className="truncate max-w-[150px]">{lead.email}</div>
-                        <div className="text-xs opacity-50">{lead.phone}</div>
-                    </td>
-                    <td className="px-4 py-3">{lead.plan}</td>
-                    <td className="px-4 py-3">
-                      {lead.status === 'paid' ? (
-                        <span className="bg-green-500/10 text-green-400 px-2 py-1 rounded text-xs font-bold border border-green-500/20">Pago</span>
-                      ) : (
-                        <span className="bg-yellow-500/10 text-yellow-400 px-2 py-1 rounded text-xs font-bold border border-yellow-500/20">Pendente</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {data.leads.length === 0 ? (
+                    <tr>
+                        <td colSpan={6} className="text-center py-8 text-slate-600">Nenhum dado encontrado ainda.</td>
+                    </tr>
+                ) : (
+                    data.leads.map((lead: any) => (
+                    <tr key={lead.id} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                            {new Date(lead.date).toLocaleDateString('pt-BR')} <br/>
+                            <span className="text-xs opacity-50">{new Date(lead.date).toLocaleTimeString('pt-BR')}</span>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-white truncate max-w-[150px]">{lead.name}</td>
+                        <td className="px-4 py-3">
+                            <div className="truncate max-w-[150px]">{lead.email}</div>
+                            <div className="text-xs opacity-50">{lead.phone}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                            <div className="flex items-center gap-1 text-slate-300">
+                                <MapPin size={12} className="text-slate-500"/> {lead.city}
+                            </div>
+                        </td>
+                        <td className="px-4 py-3">{lead.plan}</td>
+                        <td className="px-4 py-3">
+                        {lead.status === 'paid' ? (
+                            <span className="bg-green-500/10 text-green-400 px-2 py-1 rounded text-xs font-bold border border-green-500/20">Pago</span>
+                        ) : (
+                            <span className="bg-yellow-500/10 text-yellow-400 px-2 py-1 rounded text-xs font-bold border border-yellow-500/20">Pendente</span>
+                        )}
+                        </td>
+                    </tr>
+                    ))
+                )}
               </tbody>
             </table>
           </div>

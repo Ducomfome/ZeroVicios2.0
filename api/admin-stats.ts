@@ -17,18 +17,31 @@ const app = initFirebase();
 const db = app ? getFirestore(app) : null;
 
 export default async function handler(req: any, res: any) {
-  // Simples verificação de segurança via query param ou header (opcional)
-  // Em produção, use autenticação robusta.
-  
+  // Estrutura padrão zerada para não quebrar o frontend se o DB falhar
+  const emptyStats = {
+      financial: { revenue: 0, sales: 0, leads: 0, conversionRate: 0 },
+      vsl: { 
+        plays: 0, completes: 0, retention: 0, 
+        funnel: [
+          { name: 'Play', value: 0 },
+          { name: '25%', value: 0 },
+          { name: '50%', value: 0 },
+          { name: '75%', value: 0 },
+          { name: 'Fim', value: 0 }
+        ] 
+      },
+      leads: [],
+      dbStatus: "disconnected"
+  };
+
   if (!db) {
-    return res.status(500).json({ error: "Database not connected" });
+    return res.status(200).json(emptyStats);
   }
 
   try {
     // 1. Buscar Transações (Leads e Vendas)
-    // Nota: Em escala, usar paginação ou contadores agregados.
     const transactionsRef = collection(db, "transactions");
-    const q = query(transactionsRef); // Pega tudo (cuidado com custos em grande escala)
+    const q = query(transactionsRef); 
     const snapshot = await getDocs(q);
 
     let totalRevenue = 0;
@@ -36,27 +49,22 @@ export default async function handler(req: any, res: any) {
     let totalLeads = 0;
     const leadsList: any[] = [];
     
-    // Processamento de dados de localização/idade (simulados ou extraídos se disponíveis)
-    const cityStats: Record<string, number> = {};
-
     snapshot.forEach(doc => {
       const data = doc.data();
-      
-      // Contabiliza Lead (Gerou Pix)
       totalLeads++;
 
-      // Lista para tabela (últimos 50)
-      if (leadsList.length < 50) {
+      // Lista para tabela (limitada a 50 no array para não pesar)
+      if (leadsList.length < 100) {
         leadsList.push({
           id: doc.id,
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          status: data.status, // pending, paid
+          name: data.name || "Sem Nome",
+          email: data.email || "Sem Email",
+          phone: data.phone || "",
+          status: data.status,
           plan: data.plan,
           price: data.price,
           date: data.created_at,
-          city: "Desconhecido" // O formulário atual não pede cidade, precisaria de uma API de CEP ou IP
+          city: data.location || "Brasil" // Lê a localização salva
         });
       }
 
@@ -94,11 +102,13 @@ export default async function handler(req: any, res: any) {
           { name: 'Fim', value: vslData.completes || 0 },
         ]
       },
-      leads: leadsList
+      leads: leadsList,
+      dbStatus: "connected"
     });
 
   } catch (error: any) {
     console.error("Erro admin stats:", error);
-    return res.status(500).json({ error: error.message });
+    // Retorna vazio mas com mensagem de erro no console
+    return res.status(200).json(emptyStats);
   }
 }
