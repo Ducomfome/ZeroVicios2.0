@@ -285,11 +285,12 @@ export default function App() {
                      <img src="https://i.imgur.com/5wouai7.png" alt="Kit 3" className="object-contain w-full h-full drop-shadow-xl" />
                 </div>
                 <div className="flex justify-center items-end gap-1 mb-6">
-                    <span className="text-4xl font-black text-slate-900">R$ 5,00</span>
+                    <span className="text-sm text-slate-400 mb-1">12x</span>
+                    <span className="text-4xl font-black text-slate-900">R$ 12,45</span>
                 </div>
-                <p className="text-slate-500 text-sm mb-6">Valor de Teste</p>
+                <p className="text-slate-500 text-sm mb-6">Ou R$ 123,90 à vista</p>
                 <button 
-                  onClick={() => openModal("Kit 3 Meses", 5.00)} 
+                  onClick={() => openModal("Kit 3 Meses", 123.90)} 
                   className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-4 rounded-xl transition-colors border border-slate-300"
                 >
                   COMPRAR KIT 3 MESES
@@ -310,10 +311,12 @@ export default function App() {
                      <img src="https://i.imgur.com/pNINamC.png" alt="Kit 5" className="relative object-contain w-full h-full transform scale-110 drop-shadow-2xl transition-transform hover:scale-125 duration-500" />
                 </div>
                 <div className="mb-8">
+                    <p className="text-sm text-red-500 line-through font-medium">De R$ 297,00</p>
                     <div className="flex justify-center items-end gap-1">
-                        <span className="text-6xl font-black text-green-600">R$ 5,00</span>
+                        <span className="text-lg text-slate-600 font-bold mb-2">12x</span>
+                        <span className="text-6xl font-black text-green-600">R$ 16,87</span>
                     </div>
-                    <p className="text-slate-500 text-sm mt-2 font-medium">Valor de Teste</p>
+                    <p className="text-slate-500 text-sm mt-2 font-medium">Ou R$ 167,90 à vista</p>
                     <span className="inline-block mt-2 bg-red-100 text-red-600 text-xs font-bold px-3 py-1 rounded-full animate-pulse">
                         🔥 Economize 45% Hoje
                     </span>
@@ -326,7 +329,7 @@ export default function App() {
                 </ul>
 
                 <button 
-                  onClick={() => openModal("Kit 5 Meses", 5.00)} 
+                  onClick={() => openModal("Kit 5 Meses", 167.90)} 
                   className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white text-xl font-black py-6 rounded-2xl shadow-lg shadow-green-500/30 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 group"
                 >
                   QUERO O MAIS VENDIDO
@@ -344,11 +347,12 @@ export default function App() {
                      <img src="https://i.imgur.com/aJoKk1u.png" alt="Kit 12" className="object-contain w-full h-full drop-shadow-xl" />
                 </div>
                 <div className="flex justify-center items-end gap-1 mb-6">
-                    <span className="text-4xl font-black text-slate-900">R$ 5,00</span>
+                    <span className="text-sm text-slate-400 mb-1">12x</span>
+                    <span className="text-4xl font-black text-slate-900">R$ 22,89</span>
                 </div>
-                <p className="text-slate-500 text-sm mb-6">Valor de Teste</p>
+                <p className="text-slate-500 text-sm mb-6">Ou R$ 227,90 à vista</p>
                 <button 
-                  onClick={() => openModal("Kit 12 Meses", 5.00)} 
+                  onClick={() => openModal("Kit 12 Meses", 227.90)} 
                   className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-4 rounded-xl transition-colors border border-slate-300"
                 >
                   COMPRAR KIT 12 MESES
