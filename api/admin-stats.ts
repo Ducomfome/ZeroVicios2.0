@@ -25,8 +25,8 @@ const app = initFirebase();
 const db = app ? getFirestore(app) : null;
 
 export default async function handler(req: any, res: any) {
-  // Estrutura padrão zerada para não quebrar o frontend se o DB falhar
-  const emptyStats = {
+  // Estrutura padrão zerada
+  const stats = {
       financial: { revenue: 0, sales: 0, leads: 0, conversionRate: 0 },
       vsl: { 
         plays: 0, completes: 0, retention: 0, 
@@ -43,11 +43,13 @@ export default async function handler(req: any, res: any) {
   };
 
   if (!db) {
-    return res.status(200).json(emptyStats);
+    return res.status(200).json(stats);
   }
 
+  stats.dbStatus = "connected";
+
+  // BLOCO 1: Buscar Transações (Leads e Vendas)
   try {
-    // 1. Buscar Transações (Leads e Vendas)
     const transactionsRef = collection(db, "transactions");
     const q = query(transactionsRef); 
     const snapshot = await getDocs(q);
@@ -72,7 +74,8 @@ export default async function handler(req: any, res: any) {
           plan: data.plan,
           price: data.price,
           date: data.created_at,
-          city: data.location || "Brasil" // Lê a localização salva
+          // Agora mostra exatamente o que foi salvo ou avisa que está pendente
+          city: data.location || "Localização Pendente" 
         });
       }
 
@@ -83,40 +86,48 @@ export default async function handler(req: any, res: any) {
       }
     });
 
-    // 2. Buscar Analytics da VSL
-    const vslRef = doc(db, "analytics", "vsl_stats");
-    const vslSnap = await getDoc(vslRef);
-    const vslData = vslSnap.exists() ? vslSnap.data()['vsl'] || {} : {};
-
     // Ordenar leads por data (recente primeiro)
     leadsList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    return res.status(200).json({
-      financial: {
-        revenue: totalRevenue,
-        sales: totalSales,
-        leads: totalLeads,
-        conversionRate: totalLeads > 0 ? ((totalSales / totalLeads) * 100).toFixed(2) : 0
-      },
-      vsl: {
-        plays: vslData.plays || 0,
-        completes: vslData.completes || 0,
-        retention: vslData.plays > 0 ? ((vslData.completes / vslData.plays) * 100).toFixed(2) : 0,
-        funnel: [
-          { name: 'Play', value: vslData.plays || 0 },
-          { name: '25%', value: vslData.progress_25 || 0 },
-          { name: '50%', value: vslData.progress_50 || 0 },
-          { name: '75%', value: vslData.progress_75 || 0 },
-          { name: 'Fim', value: vslData.completes || 0 },
-        ]
-      },
-      leads: leadsList,
-      dbStatus: "connected"
-    });
+    // Atualiza estatísticas financeiras
+    stats.financial.revenue = totalRevenue;
+    stats.financial.sales = totalSales;
+    stats.financial.leads = totalLeads;
+    stats.financial.conversionRate = totalLeads > 0 ? ((totalSales / totalLeads) * 100).toFixed(2) : 0;
+    stats.leads = leadsList;
 
   } catch (error: any) {
-    console.error("Erro admin stats:", error);
-    // Retorna vazio mas com mensagem de erro no console
-    return res.status(200).json(emptyStats);
+    console.error("⚠️ Erro parcial ao buscar Transações:", error.message);
   }
+
+  // BLOCO 2: Buscar Analytics da VSL
+  try {
+    const vslRef = doc(db, "analytics", "vsl_stats");
+    const vslSnap = await getDoc(vslRef);
+    
+    if (vslSnap.exists()) {
+        const dataToUse = vslSnap.data()['vsl'] || vslSnap.data(); 
+        
+        const plays = dataToUse.plays || 0;
+        const completes = dataToUse.completes || 0;
+        const p25 = dataToUse.progress_25 || 0;
+        const p50 = dataToUse.progress_50 || 0;
+        const p75 = dataToUse.progress_75 || 0;
+
+        stats.vsl.plays = plays;
+        stats.vsl.completes = completes;
+        stats.vsl.retention = plays > 0 ? ((completes / plays) * 100).toFixed(2) : 0;
+        stats.vsl.funnel = [
+          { name: 'Play', value: plays },
+          { name: '25%', value: p25 },
+          { name: '50%', value: p50 },
+          { name: '75%', value: p75 },
+          { name: 'Fim', value: completes },
+        ];
+    }
+  } catch (error: any) {
+    console.error("⚠️ Erro parcial ao buscar VSL Stats:", error.message);
+  }
+
+  return res.status(200).json(stats);
 }

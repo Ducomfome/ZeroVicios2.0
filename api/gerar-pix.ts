@@ -44,10 +44,26 @@ export default async function handler(req: any, res: any) {
     const { name, email, cpf, price, plan, phone, fbc, fbp } = body;
     const transactionId = crypto.randomUUID();
 
-    // Captura Localização via Headers da Vercel
-    const city = req.headers['x-vercel-ip-city'] ? decodeURIComponent(req.headers['x-vercel-ip-city']) : 'Desconhecido';
-    const region = req.headers['x-vercel-ip-country-region'] || '';
-    const userLocation = region ? `${city} - ${region}` : city;
+    // Captura Localização via Headers da Vercel (Lógica Aprimorada)
+    let userLocation = "Desconhecido";
+    try {
+        const rawCity = req.headers['x-vercel-ip-city'];
+        const city = rawCity ? decodeURIComponent(rawCity) : null;
+        const region = req.headers['x-vercel-ip-country-region']; // Ex: SP, RJ
+        const country = req.headers['x-vercel-ip-country']; // Ex: BR
+
+        if (city && region) {
+            userLocation = `${city} - ${region}`;
+        } else if (city) {
+            userLocation = city;
+        } else if (region && country) {
+            userLocation = `${region}, ${country}`;
+        } else if (country) {
+            userLocation = country;
+        }
+    } catch (e) {
+        console.error("Erro ao decodificar cidade:", e);
+    }
 
     // Inicializar Firebase
     const app = initFirebase();
