@@ -64,13 +64,15 @@ export function VideoPlayer({
   };
 
   const handlePlayClick = async () => {
-    (Object.keys(refsMap.current) as VideoKey[]).forEach((k) => {
-      if (k !== id && refsMap.current[k]) {
-        try {
-          refsMap.current[k]!.pause();
-        } catch {}
-      }
-    });
+    if (refsMap.current) {
+        (Object.keys(refsMap.current) as VideoKey[]).forEach((k) => {
+        if (k !== id && refsMap.current[k]) {
+            try {
+            refsMap.current[k]!.pause();
+            } catch {}
+        }
+        });
+    }
     setCurrentlyPlaying(id);
     setIsPosterVisible(false);
     setIsLoading(true);
@@ -80,7 +82,9 @@ export function VideoPlayer({
     }
 
     try {
-      await refsMap.current[id]?.play();
+      if (refsMap.current && refsMap.current[id]) {
+        await refsMap.current[id]?.play();
+      }
     } catch (err) {
       console.error("Erro ao dar play:", err);
       setIsLoading(false);

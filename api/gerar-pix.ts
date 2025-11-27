@@ -3,7 +3,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import crypto from 'crypto';
 
-// CONFIGURAÇÃO DIRETA DO FIREBASE (FALLBACK)
+// CONFIGURAÇÃO DIRETA DO FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyC1PSUlYQ8cliInVq9Nak-_HbmWLl7oBc0",
   authDomain: "zero-vicios-tracker.firebaseapp.com",
@@ -18,7 +18,6 @@ const initFirebase = () => {
   try {
     return !getApps().length ? initializeApp(firebaseConfig) : getApp();
   } catch (e) { 
-    console.error('❌ Erro Firebase config:', e);
     return null; 
   }
 };
@@ -39,18 +38,16 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Garante que o body seja um objeto
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { name, email, cpf, price, plan, phone, fbc, fbp, cep, street, number, district, city, state } = body;
     const transactionId = crypto.randomUUID();
 
-    // Captura Localização via Headers da Vercel (Lógica Aprimorada)
     let userLocation = "Desconhecido";
     try {
         const rawCity = req.headers['x-vercel-ip-city'];
         const cityHeader = rawCity ? decodeURIComponent(rawCity) : null;
-        const region = req.headers['x-vercel-ip-country-region']; // Ex: SP, RJ
-        const country = req.headers['x-vercel-ip-country']; // Ex: BR
+        const region = req.headers['x-vercel-ip-country-region']; 
+        const country = req.headers['x-vercel-ip-country'];
 
         if (cityHeader && region) {
             userLocation = `${cityHeader} - ${region}`;
@@ -65,29 +62,24 @@ export default async function handler(req: any, res: any) {
         console.error("Erro ao decodificar cidade:", e);
     }
 
-    // Inicializar Firebase
     const app = initFirebase();
     const db = app ? getFirestore(app) : null;
-    
-    // Tenta pegar do ENV, se não tiver, usa chave de teste ou avisa
     const SECRET_KEY = process.env.PARADISE_SECRET_KEY;
 
-    // 🎯 MAPEAMENTO DOS 3 PRODUTOS
     const productHashMap: { [key: string]: string } = {
       "Kit 3 Meses": "prod_d6a5ebe96b2eb490",  
       "Kit 5 Meses": "prod_9dc131fea65a345d",   
       "Kit 12 Meses": "prod_c5e1a25852bd498a", 
     };
 
-    const productHash = productHashMap[plan];
+    const productHash = productHashMap[plan] || "prod_9dc131fea65a345d";
 
-    // Payload para Paradise
     const paradisePayload = {
       amount: Math.round(Number(price) * 100),
       description: `${plan} - Zero Vicios`,
       reference: transactionId,
       postback_url: `${(process.env.NEXT_PUBLIC_BASE_URL || 'https://' + process.env.VERCEL_URL).replace(/\/$/, '')}/api/webhook`,
-      productHash: productHash || "prod_9dc131fea65a345d", // Fallback seguro
+      productHash: productHash, 
       customer: {
         name: name.substring(0, 100),
         email: email,
@@ -101,7 +93,6 @@ export default async function handler(req: any, res: any) {
       }
     };
 
-    // Se tiver chave da Paradise, chama a API, se não, simula sucesso (Modo Teste do Desenvolvedor)
     let data;
     if (SECRET_KEY) {
         const response = await fetch("https://multi.paradisepags.com/api/v1/transaction.php", {
@@ -115,13 +106,12 @@ export default async function handler(req: any, res: any) {
         const responseText = await response.text();
         data = JSON.parse(responseText);
     } else {
-        // MODO SIMULAÇÃO (Para não travar sem chave)
         console.warn("⚠️ API Key Paradise ausente. Usando modo simulação.");
         data = {
             status: "success",
             transaction_id: transactionId,
             qr_code: "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-42661417400052040000530398654041.005802BR5913Zero Vicios6008Brasilia62070503***6304E2CA",
-            qr_code_base64: "", // Simulação não gera imagem real
+            qr_code_base64: "", 
             amount: Math.round(Number(price) * 100),
             expires_at: new Date(Date.now() + 10 * 60000).toISOString()
         };
@@ -138,17 +128,15 @@ export default async function handler(req: any, res: any) {
             price: price,
             phone: phone,
             cpf: cpf,
-            // Dados de Endereço
             address_cep: cep || '',
             address_street: street || '',
             address_number: number || '',
             address_district: district || '',
             address_city: city || '',
             address_state: state || '',
-            
-            location: userLocation, // Salva Cidade - Estado (IP)
-            fbc: fbc || null, // Pixel Cookie
-            fbp: fbp || null, // Pixel Cookie
+            location: userLocation,
+            fbc: fbc || null,
+            fbp: fbp || null,
             paradise_transaction_id: data.transaction_id,
             product_hash: productHash,
             created_at: new Date().toISOString(),

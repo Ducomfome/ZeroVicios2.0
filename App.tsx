@@ -1,14 +1,16 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, Suspense } from "react";
 import {
   CheckCircle, ShieldCheck, Truck, FlaskConical, Heart, 
-  Lightbulb, Star, Lock, ArrowRight, MessageCircle
+  Lightbulb, Star, Lock, ArrowRight, MessageCircle, Loader2
 } from "lucide-react";
 
 // Components
-import { AdminDashboard } from "./components/AdminDashboard";
 import { CountdownBar } from "./components/CountdownBar";
 import { VideoPlayer, VideoKey } from "./components/VideoPlayer";
 import { CheckoutModal } from "./components/CheckoutModal";
+
+// Lazy Load Admin Dashboard para evitar conflitos de bibliotecas (Recharts) no site principal
+const AdminDashboard = React.lazy(() => import('./components/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
 
 const VIDEO_SOURCES: Record<VideoKey, string> = {
   vsl: "https://pub-9ad786fb39ec4b43b2905a55edcb38d9.r2.dev/1120.mp4",
@@ -33,13 +35,11 @@ export default function App() {
     vsl: null, test1: null, test2: null,
   });
 
-  // Verificação Admin e Scroll CTA
   useEffect(() => {
     if (window.location.pathname === '/admin/painel-secreto') {
         setIsAdmin(true);
     }
     
-    // Pixel ViewContent
     if (typeof window !== 'undefined' && window.fbq) {
         window.fbq('track', 'ViewContent');
     }
@@ -72,7 +72,11 @@ export default function App() {
   };
 
   if (isAdmin) {
-    return <AdminDashboard />;
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center text-white"><Loader2 className="animate-spin mr-2"/> Carregando Painel...</div>}>
+            <AdminDashboard />
+        </Suspense>
+    );
   }
 
   return (

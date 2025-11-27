@@ -14,7 +14,7 @@ declare global {
 
 const FACEBOOK_PIXEL_ID = '1646006349697772';
 
-// CONFIGURAÇÃO DIRETA DO FIREBASE (CLIENT-SIDE FALLBACK)
+// CONFIGURAÇÃO DIRETA DO FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyC1PSUlYQ8cliInVq9Nak-_HbmWLl7oBc0",
   authDomain: "zero-vicios-tracker.firebaseapp.com",
@@ -25,7 +25,6 @@ const firebaseConfig = {
   measurementId: "G-R22SS7H418"
 };
 
-// Inicializa Firebase apenas uma vez
 const initFirebase = () => {
     try {
       return !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -70,15 +69,6 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
   const [isLoadingCep, setIsLoadingCep] = useState(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   
-  // Reset state on open
-  useEffect(() => {
-    if (isOpen) {
-        setCheckoutState('form');
-        setPixData(null);
-        setIsCheckingPayment(false);
-    }
-  }, [isOpen]);
-
   const [address, setAddress] = useState({
     cep: '',
     street: '',
@@ -88,28 +78,30 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
     state: ''
   });
 
-  // LISTENER DE PAGAMENTO EM TEMPO REAL
+  useEffect(() => {
+    if (isOpen) {
+        setCheckoutState('form');
+        setPixData(null);
+        setIsCheckingPayment(false);
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     let unsubscribe: () => void;
-
     if (checkoutState === 'pix' && pixData?.id && db) {
-        // Escuta o documento da transação no Firebase
         unsubscribe = onSnapshot(doc(db, "transactions", pixData.id), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                // Se o status mudar para 'paid', libera a tela de sucesso
                 if (data.status === 'paid') {
                     handlePaymentSuccess();
                 }
             }
         });
     }
-
     return () => {
         if (unsubscribe) unsubscribe();
     };
   }, [checkoutState, pixData, db]);
-
 
   if (!isOpen) return null;
 
@@ -153,7 +145,6 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
     const firstName = rawName.split(' ')[0];
     const lastName = rawName.split(' ').slice(1).join(' ');
 
-    // ADVANCED MATCHING
     if (typeof window !== 'undefined' && window.fbq) {
         window.fbq('init', FACEBOOK_PIXEL_ID, {
             em: rawEmail,
@@ -226,7 +217,6 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
     }
   };
 
-  // Transição para tela de sucesso (só chamada se pago)
   const handlePaymentSuccess = () => {
      if (checkoutState !== 'success') {
         trackPixel('Purchase', {
@@ -240,7 +230,6 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
      }
   };
 
-  // Botão manual de verificação
   const handleManualCheck = async () => {
     if (!pixData?.id || !db) return;
     
@@ -270,7 +259,6 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
           <X className="w-5 h-5" />
         </button>
 
-        {/* Header do Modal */}
         <div className="bg-slate-50 p-6 border-b border-slate-100 text-center relative">
              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-emerald-600"></div>
              <div className="flex justify-center mb-2 items-center text-green-600 gap-1">
@@ -292,15 +280,12 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
         </div>
 
         <div className="p-6 overflow-y-auto custom-scrollbar">
-          {/* FORMULÁRIO */}
           {checkoutState === 'form' && (
             <form onSubmit={handleGeneratePix} className="space-y-4">
-              
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex items-start gap-3 text-xs text-yellow-800 mb-4">
                 <AlertTriangle className="w-5 h-5 flex-shrink-0 text-yellow-600"/>
                 <p>Devido à alta demanda, seu kit está reservado por apenas 10 minutos.</p>
               </div>
-
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1 ml-1">Nome Completo</label>
                 <input type="text" name="name" className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none" placeholder="Digite seu nome completo" required />
@@ -320,7 +305,6 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
                 </div>
               </div>
 
-              {/* SEÇÃO ENDEREÇO */}
               <div className="pt-2 border-t border-slate-100">
                 <p className="text-xs font-bold text-green-700 uppercase mb-3 flex items-center"><Truck size={14} className="mr-1"/> Dados de Entrega</p>
                 <div className="space-y-3">
@@ -375,7 +359,6 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
             </form>
           )}
 
-          {/* LOADING */}
           {checkoutState === 'loading' && (
             <div className="flex flex-col items-center py-12 text-center">
               <div className="relative mb-6">
@@ -389,10 +372,8 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
             </div>
           )}
 
-          {/* PIX DISPLAY */}
           {checkoutState === 'pix' && pixData && (
             <div className="text-center space-y-6 animate-fade-in pb-4">
-              
               <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-sm mb-4">
                 <p className="font-bold flex items-center justify-center gap-2"><Clock className="w-4 h-4"/> Pague em até 10 minutos</p>
                 <p className="text-xs mt-1">Para garantir o envio imediato do seu kit.</p>
@@ -440,11 +421,9 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
                     )}
                 </button>
               </div>
-
             </div>
           )}
 
-          {/* TELA DE SUCESSO / RASTREIO */}
           {checkoutState === 'success' && (
               <div className="text-center py-8 space-y-6 animate-fade-in-up">
                   <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 relative">
@@ -481,10 +460,8 @@ export function CheckoutModal({ isOpen, onClose, selectedPlan }: CheckoutModalPr
                   </button>
               </div>
           )}
-
         </div>
         
-        {/* Footer do Modal */}
         <div className="bg-slate-50 p-4 text-center border-t border-slate-100">
             <p className="text-[10px] text-slate-400">Ao finalizar a compra você concorda com nossos Termos de Uso.</p>
         </div>
