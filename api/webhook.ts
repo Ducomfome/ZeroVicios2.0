@@ -27,7 +27,7 @@ const db = app ? getFirestore(app) : null;
 
 // TOKEN FACEBOOK HARDCODED (Para garantir envio se a variável de ambiente falhar)
 const FACEBOOK_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN || "EAALT3yVJXDABQAWmBPC8iZBRGhuEadsOxCZA0CtB2IZBXqhAi7CZBNB5tvVkG1fPxttSZA49e7RfCTrgqo1zPGh4hs87UQFd61oAxtIYzcwbppG3lMTgNcQmDCag86XnsliYjZBqkeouG7J1VKOcLxhZCpFVDzCOeycwGpUNYmZCUk99KEyjQucdTGHFhaKWc883jgZDZD";
-const FACEBOOK_PIXEL_ID = '792797553335143'; 
+const FACEBOOK_PIXEL_ID = '1646006349697772'; 
 
 // Função auxiliar para criar Hash SHA256 (Exigência do Facebook para CAPI)
 const hashData = (data: string) => {

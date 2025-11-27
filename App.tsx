@@ -27,7 +27,7 @@ declare global {
   }
 }
 
-const FACEBOOK_PIXEL_ID = '792797553335143';
+const FACEBOOK_PIXEL_ID = '1646006349697772';
 
 type VideoKey = "vsl" | "test1" | "test2";
 
