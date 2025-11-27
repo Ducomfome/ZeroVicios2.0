@@ -8,7 +8,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'recharts': ['recharts'],
+          'recharts': ['recharts'], // ISOLAMENTO: Gráficos ficam longe do site principal
           'vendor': ['react', 'react-dom']
         }
       }
