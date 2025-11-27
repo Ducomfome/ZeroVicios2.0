@@ -16,6 +16,7 @@ import {
   MessageCircle,
   AlertTriangle
 } from "lucide-react";
+import { AdminDashboard } from "./components/AdminDashboard";
 
 // =========================================================
 // TIPOS E CONFIGURAÇÕES
@@ -85,7 +86,7 @@ function CountdownBar() {
 }
 
 // =========================================================
-// COMPONENTE: PLAYER (FLEXÍVEL)
+// COMPONENTE: PLAYER (FLEXÍVEL COM RASTREAMENTO)
 // =========================================================
 function Player({
   id,
@@ -107,6 +108,7 @@ function Player({
   const [isLoading, setIsLoading] = useState(false);
   const [isPosterVisible, setIsPosterVisible] = useState(true);
   const localRef = useRef<HTMLVideoElement | null>(null);
+  const trackedQuartiles = useRef<Set<number>>(new Set()); // Para não enviar 50% várias vezes
   const isPlaying = currentlyPlaying === id;
 
   useEffect(() => {
@@ -115,6 +117,31 @@ function Player({
       refsMap.current[id] = null;
     };
   }, [id, refsMap]);
+
+  const sendVideoEvent = async (eventType: string) => {
+    try {
+        await fetch('/api/track-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventType, videoId: id })
+        });
+    } catch (e) { console.error('Erro tracking video', e); }
+  };
+
+  const handleTimeUpdate = () => {
+    const video = localRef.current;
+    if (!video) return;
+
+    const progress = (video.currentTime / video.duration) * 100;
+    
+    // Rastreamento de quartis
+    [25, 50, 75].forEach(q => {
+        if (progress >= q && !trackedQuartiles.current.has(q)) {
+            trackedQuartiles.current.add(q);
+            sendVideoEvent(`${q}%`);
+        }
+    });
+  };
 
   const handlePlayClick = async () => {
     (Object.keys(refsMap.current) as VideoKey[]).forEach((k) => {
@@ -127,6 +154,12 @@ function Player({
     setCurrentlyPlaying(id);
     setIsPosterVisible(false);
     setIsLoading(true);
+    
+    // Rastreia Play
+    if (trackedQuartiles.current.size === 0) {
+        sendVideoEvent('play');
+    }
+
     try {
       await refsMap.current[id]?.play();
     } catch (err) {
@@ -152,6 +185,7 @@ function Player({
         controls={isPlaying}
         onWaiting={() => setIsLoading(true)}
         onPlaying={() => setIsLoading(false)}
+        onTimeUpdate={handleTimeUpdate}
         onPause={() => {
           if (currentlyPlaying === id) setCurrentlyPlaying(null);
           setIsPosterVisible(true);
@@ -159,6 +193,7 @@ function Player({
         onEnded={() => {
           setCurrentlyPlaying(null);
           setIsPosterVisible(true);
+          sendVideoEvent('complete');
         }}
         className="w-full h-full object-cover"
       />
@@ -203,6 +238,15 @@ function Player({
 // PÁGINA PRINCIPAL
 // =========================================================
 export default function App() {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Verificação de Rota Secreta
+  useEffect(() => {
+    if (window.location.pathname === '/admin/painel-secreto') {
+        setIsAdmin(true);
+    }
+  }, []);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [checkoutState, setCheckoutState] = useState<'form' | 'loading' | 'pix' | 'success'>('form');
   const [selectedPlan, setSelectedPlan] = useState<{ name: string; price: number } | null>(null);
@@ -349,6 +393,11 @@ export default function App() {
       });
     };
   }, []);
+
+  // SE FOR ADMIN, RENDERIZA O DASHBOARD
+  if (isAdmin) {
+    return <AdminDashboard />;
+  }
 
   return (
     <div className="font-sans text-slate-800 bg-slate-50 min-h-screen selection:bg-green-200 selection:text-green-900 pb-20 md:pb-0">

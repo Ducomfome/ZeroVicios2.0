@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, updateDoc } from 'firebase/firestore';
+import crypto from 'crypto';
 
 const initFirebase = () => {
     const configStr = process.env.NEXT_PUBLIC_FIREBASE_CONFIG;
@@ -19,22 +20,35 @@ const db = app ? getFirestore(app) : null;
 const FACEBOOK_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN;
 const FACEBOOK_PIXEL_ID = '792797553335143'; 
 
+// Função auxiliar para criar Hash SHA256 (Exigência do Facebook para CAPI)
+const hashData = (data: string) => {
+    if (!data) return null;
+    return crypto.createHash('sha256').update(data).digest('hex');
+};
+
 async function trackFacebookEvent(eventName: string, userData: any, customData: any, eventId?: string) {
   if (!FACEBOOK_ACCESS_TOKEN) {
     console.log("⚠️ FACEBOOK_ACCESS_TOKEN não configurado. Pulei o evento.");
     return;
   }
 
-  // Prepara user_data filtrando campos vazios
+  // Prepara user_data com HASH SHA256 (Padrão Ouro do Facebook)
   const fbUserData: any = {};
+  
   if (userData.fbp) fbUserData.fbp = userData.fbp;
   if (userData.fbc) fbUserData.fbc = userData.fbc;
+  
   if (userData.email) {
-      // O Facebook recomenda hash SHA256 do email, mas aceita texto simples (embora avise) se você não tiver como hashear no serverless facilmente sem libs extras.
-      // O ideal é usar uma lib crypto nativa se possível, mas aqui enviaremos como array conforme doc básica.
-      fbUserData.em = [userData.email]; 
+      // Normaliza e Hash
+      const normalizedEmail = userData.email.trim().toLowerCase();
+      fbUserData.em = [hashData(normalizedEmail)]; 
   }
-  if (userData.phone) fbUserData.ph = [userData.phone];
+  
+  if (userData.phone) {
+      // Normaliza e Hash (remove tudo que não for número)
+      const normalizedPhone = userData.phone.replace(/\D/g, '');
+      fbUserData.ph = [hashData(normalizedPhone)];
+  }
 
   const payload = {
     data: [{
